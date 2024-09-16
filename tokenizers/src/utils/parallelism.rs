@@ -32,7 +32,11 @@ pub fn get_parallelism() -> bool {
             v.make_ascii_lowercase();
             !matches!(v.as_ref(), "" | "off" | "false" | "f" | "no" | "n" | "0")
         }
+        #[cfg(not(miri))]
         Err(_) => true, // If we couldn't get the variable, we use the default
+        // FIXME: for now turn parallelism off under miri, otherwise complains about crossbeam-epoch
+        #[cfg(miri)]
+        Err(_) => false,
     }
 }
 
