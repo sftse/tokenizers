@@ -42,7 +42,7 @@ impl<T: DestroyPtr> Drop for RefMutGuard<'_, T> {
 }
 
 #[derive(Clone)]
-pub struct RefMutContainer<T> {
+pub(crate) struct RefMutContainer<T> {
     inner: Arc<Mutex<Option<*mut T>>>,
 }
 impl<T> RefMutContainer<T> {
