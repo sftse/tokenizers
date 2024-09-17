@@ -1,3 +1,6 @@
+use std::sync::Arc;
+use std::sync::Mutex;
+
 use tokenizers as tk;
 
 use pyo3::exceptions;
@@ -260,12 +263,15 @@ impl PyPreTokenizedString {
 #[pyclass(module = "tokenizers", name = "PreTokenizedString")]
 #[derive(Clone)]
 pub struct PyPreTokenizedStringRefMut {
-    inner: RefMutContainer<PreTokenizedString>,
+    inner: Arc<Mutex<RefMutContainer<PreTokenizedString>>>,
 }
+
+unsafe impl Send for PyPreTokenizedStringRefMut {}
+unsafe impl Sync for PyPreTokenizedStringRefMut {}
 
 impl DestroyPtr for PyPreTokenizedStringRefMut {
     fn destroy(&mut self) {
-        self.inner.destroy();
+        self.inner.lock().unwrap().destroy();
     }
 }
 
@@ -289,18 +295,24 @@ impl PyPreTokenizedStringRefMut {
 impl PyPreTokenizedStringRefMut {
     fn split(&mut self, func: &Bound<'_, PyAny>) -> PyResult<()> {
         self.inner
+            .lock()
+            .unwrap()
             .map_mut(|pretok| split(pretok, func))
             .ok_or_else(PyPreTokenizedStringRefMut::destroyed_error)?
     }
 
     fn normalize(&mut self, func: &Bound<'_, PyAny>) -> PyResult<()> {
         self.inner
+            .lock()
+            .unwrap()
             .map_mut(|pretok| normalize(pretok, func))
             .ok_or_else(PyPreTokenizedStringRefMut::destroyed_error)?
     }
 
     fn tokenize(&mut self, func: &Bound<'_, PyAny>) -> PyResult<()> {
         self.inner
+            .lock()
+            .unwrap()
             .map_mut(|pretok| tokenize(pretok, func))
             .ok_or_else(PyPreTokenizedStringRefMut::destroyed_error)?
     }
@@ -308,6 +320,8 @@ impl PyPreTokenizedStringRefMut {
     #[pyo3(signature = (type_id = 0, word_idx = None))]
     fn to_encoding(&self, type_id: u32, word_idx: Option<u32>) -> PyResult<PyEncoding> {
         self.inner
+            .lock()
+            .unwrap()
             .map(|pretok| to_encoding(pretok, type_id, word_idx))
             .ok_or_else(PyPreTokenizedStringRefMut::destroyed_error)?
     }
@@ -322,6 +336,8 @@ impl PyPreTokenizedStringRefMut {
         offset_type: PyOffsetType,
     ) -> PyResult<Vec<PySplit>> {
         self.inner
+            .lock()
+            .unwrap()
             .map(|pretok| get_splits(pretok, offset_referential, offset_type))
             .ok_or_else(PyPreTokenizedStringRefMut::destroyed_error)
     }

@@ -41,35 +41,29 @@ impl<T: DestroyPtr> Drop for RefMutGuard<'_, T> {
     }
 }
 
-#[derive(Clone)]
 pub(crate) struct RefMutContainer<T> {
-    inner: Arc<Mutex<Option<*mut T>>>,
+    inner: Option<*mut T>,
 }
 impl<T> RefMutContainer<T> {
-    pub fn new(content: &mut T) -> Self {
-        Self {
-            inner: Arc::new(Mutex::new(Some(content))),
-        }
+    pub fn new(content: &mut T) -> Arc<Mutex<Self>> {
+        Arc::new(Mutex::new(Self {
+            inner: Some(content),
+        }))
     }
 
     pub fn map<F: FnOnce(&T) -> U, U>(&self, f: F) -> Option<U> {
-        let lock = self.inner.lock().unwrap();
-        let ptr = lock.as_ref()?;
+        let ptr = self.inner.as_ref()?;
         Some(f(unsafe { ptr.as_ref().unwrap() }))
     }
 
     pub fn map_mut<F: FnOnce(&mut T) -> U, U>(&mut self, f: F) -> Option<U> {
-        let lock = self.inner.lock().unwrap();
-        let ptr = lock.as_ref()?;
+        let ptr = self.inner.as_ref()?;
         Some(f(unsafe { ptr.as_mut().unwrap() }))
     }
 }
 
 impl<T> DestroyPtr for RefMutContainer<T> {
     fn destroy(&mut self) {
-        self.inner.lock().unwrap().take();
+        self.inner.take();
     }
 }
-
-unsafe impl<T: Send> Send for RefMutContainer<T> {}
-unsafe impl<T: Sync> Sync for RefMutContainer<T> {}

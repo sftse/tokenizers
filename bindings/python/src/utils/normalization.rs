@@ -1,3 +1,6 @@
+use std::sync::Arc;
+use std::sync::Mutex;
+
 use super::regex::PyRegex;
 use super::{DestroyPtr, RefMutContainer};
 use crate::error::ToPyResult;
@@ -386,12 +389,15 @@ impl From<PyNormalizedString> for NormalizedString {
 #[pyclass(module = "tokenizers", name = "NormalizedStringRefMut")]
 #[derive(Clone)]
 pub struct PyNormalizedStringRefMut {
-    inner: RefMutContainer<NormalizedString>,
+    inner: Arc<Mutex<RefMutContainer<NormalizedString>>>,
 }
+
+unsafe impl Send for PyNormalizedStringRefMut {}
+unsafe impl Sync for PyNormalizedStringRefMut {}
 
 impl DestroyPtr for PyNormalizedStringRefMut {
     fn destroy(&mut self) {
-        self.inner.destroy();
+        self.inner.lock().unwrap().destroy();
     }
 }
 
@@ -409,6 +415,8 @@ impl PyNormalizedStringRefMut {
     /// Provides a way to access a reference to the underlying NormalizedString
     pub fn map_as_ref<F: FnOnce(&NormalizedString) -> U, U>(&self, f: F) -> PyResult<U> {
         self.inner
+            .lock()
+            .unwrap()
             .map(f)
             .ok_or_else(PyNormalizedStringRefMut::destroyed_error)
     }
@@ -416,6 +424,8 @@ impl PyNormalizedStringRefMut {
     /// Provides a way to access a mutable reference to the underlying NormalizedString
     pub fn map_as_mut<F: FnOnce(&mut NormalizedString) -> U, U>(&mut self, f: F) -> PyResult<U> {
         self.inner
+            .lock()
+            .unwrap()
             .map_mut(f)
             .ok_or_else(PyNormalizedStringRefMut::destroyed_error)
     }
@@ -426,6 +436,8 @@ impl PyNormalizedStringRefMut {
     #[getter]
     fn get_normalized(&self) -> PyResult<String> {
         self.inner
+            .lock()
+            .unwrap()
             .map(|n| n.get().to_owned())
             .ok_or_else(PyNormalizedStringRefMut::destroyed_error)
     }
@@ -433,12 +445,16 @@ impl PyNormalizedStringRefMut {
     #[getter]
     fn get_original(&self) -> PyResult<String> {
         self.inner
+            .lock()
+            .unwrap()
             .map(|n| n.get_original().to_owned())
             .ok_or_else(PyNormalizedStringRefMut::destroyed_error)
     }
 
     fn nfd(&mut self) -> PyResult<()> {
         self.inner
+            .lock()
+            .unwrap()
             .map_mut(|n| {
                 n.nfd();
             })
@@ -448,6 +464,8 @@ impl PyNormalizedStringRefMut {
 
     fn nfkd(&mut self) -> PyResult<()> {
         self.inner
+            .lock()
+            .unwrap()
             .map_mut(|n| {
                 n.nfkd();
             })
@@ -457,6 +475,8 @@ impl PyNormalizedStringRefMut {
 
     fn nfc(&mut self) -> PyResult<()> {
         self.inner
+            .lock()
+            .unwrap()
             .map_mut(|n| {
                 n.nfc();
             })
@@ -466,6 +486,8 @@ impl PyNormalizedStringRefMut {
 
     fn nfkc(&mut self) -> PyResult<()> {
         self.inner
+            .lock()
+            .unwrap()
             .map_mut(|n| {
                 n.nfkc();
             })
@@ -475,6 +497,8 @@ impl PyNormalizedStringRefMut {
 
     fn lowercase(&mut self) -> PyResult<()> {
         self.inner
+            .lock()
+            .unwrap()
             .map_mut(|n| {
                 n.lowercase();
             })
@@ -484,6 +508,8 @@ impl PyNormalizedStringRefMut {
 
     fn uppercase(&mut self) -> PyResult<()> {
         self.inner
+            .lock()
+            .unwrap()
             .map_mut(|n| {
                 n.uppercase();
             })
@@ -493,6 +519,8 @@ impl PyNormalizedStringRefMut {
 
     fn prepend(&mut self, s: &str) -> PyResult<()> {
         self.inner
+            .lock()
+            .unwrap()
             .map_mut(|n| {
                 n.prepend(s);
             })
@@ -502,6 +530,8 @@ impl PyNormalizedStringRefMut {
 
     fn append(&mut self, s: &str) -> PyResult<()> {
         self.inner
+            .lock()
+            .unwrap()
             .map_mut(|n| {
                 n.append(s);
             })
@@ -511,6 +541,8 @@ impl PyNormalizedStringRefMut {
 
     fn lstrip(&mut self) -> PyResult<()> {
         self.inner
+            .lock()
+            .unwrap()
             .map_mut(|n| {
                 n.lstrip();
             })
@@ -520,6 +552,8 @@ impl PyNormalizedStringRefMut {
 
     fn rstrip(&mut self) -> PyResult<()> {
         self.inner
+            .lock()
+            .unwrap()
             .map_mut(|n| {
                 n.rstrip();
             })
@@ -529,6 +563,8 @@ impl PyNormalizedStringRefMut {
 
     fn strip(&mut self) -> PyResult<()> {
         self.inner
+            .lock()
+            .unwrap()
             .map_mut(|n| {
                 n.strip();
             })
@@ -538,6 +574,8 @@ impl PyNormalizedStringRefMut {
 
     fn clear(&mut self) -> PyResult<()> {
         self.inner
+            .lock()
+            .unwrap()
             .map_mut(|n| {
                 n.clear();
             })
@@ -547,12 +585,16 @@ impl PyNormalizedStringRefMut {
 
     fn slice(&self, range: PyRange) -> PyResult<Option<PyNormalizedString>> {
         self.inner
+            .lock()
+            .unwrap()
             .map(|n| slice(n, &range))
             .ok_or_else(PyNormalizedStringRefMut::destroyed_error)?
     }
 
     fn filter(&mut self, func: &Bound<'_, PyAny>) -> PyResult<()> {
         self.inner
+            .lock()
+            .unwrap()
             .map_mut(|n| filter(n, func))
             .ok_or_else(PyNormalizedStringRefMut::destroyed_error)??;
         Ok(())
@@ -560,6 +602,8 @@ impl PyNormalizedStringRefMut {
 
     fn for_each(&self, func: &Bound<'_, PyAny>) -> PyResult<()> {
         self.inner
+            .lock()
+            .unwrap()
             .map(|n| for_each(n, func))
             .ok_or_else(PyNormalizedStringRefMut::destroyed_error)??;
         Ok(())
@@ -567,6 +611,8 @@ impl PyNormalizedStringRefMut {
 
     fn map(&mut self, func: &Bound<'_, PyAny>) -> PyResult<()> {
         self.inner
+            .lock()
+            .unwrap()
             .map_mut(|n| map(n, func))
             .ok_or_else(PyNormalizedStringRefMut::destroyed_error)??;
         Ok(())
@@ -579,6 +625,8 @@ impl PyNormalizedStringRefMut {
     ) -> PyResult<Vec<PyNormalizedString>> {
         Ok(ToPyResult(
             self.inner
+                .lock()
+                .unwrap()
                 .map_mut(|n| n.split(pattern, behavior.into()))
                 .ok_or_else(PyNormalizedStringRefMut::destroyed_error)?,
         )
@@ -591,6 +639,8 @@ impl PyNormalizedStringRefMut {
     fn replace(&mut self, pattern: PyPattern, content: &str) -> PyResult<()> {
         ToPyResult(
             self.inner
+                .lock()
+                .unwrap()
                 .map_mut(|n| n.replace(pattern, content))
                 .ok_or_else(PyNormalizedStringRefMut::destroyed_error)?,
         )
