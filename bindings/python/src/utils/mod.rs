@@ -1,6 +1,3 @@
-use std::marker::PhantomData;
-use std::sync::{Arc, Mutex};
-
 mod iterators;
 mod normalization;
 mod pretokenization;
@@ -14,56 +11,65 @@ pub use regex::*;
 
 // RefMut utils
 
-pub trait DestroyPtr {
-    fn destroy(&mut self);
-}
+pub(crate) use refmut::DestroyPtr;
+pub(crate) use refmut::RefMutGuard;
+pub(crate) use refmut::RefMutContainer;
 
-pub struct RefMutGuard<'r, T: DestroyPtr> {
-    content: T,
-    r: PhantomData<&'r mut T>,
-}
-impl<T: DestroyPtr> RefMutGuard<'_, T> {
-    pub fn new(content: T) -> Self {
-        Self {
-            content,
-            r: PhantomData,
+mod refmut {
+    use std::marker::PhantomData;
+    use std::sync::{Arc, Mutex};
+
+    pub trait DestroyPtr {
+        fn destroy(&mut self);
+    }
+
+    pub struct RefMutGuard<'r, T: DestroyPtr> {
+        content: T,
+        r: PhantomData<&'r mut T>,
+    }
+    impl<T: DestroyPtr> RefMutGuard<'_, T> {
+        pub fn new(content: T) -> Self {
+            Self {
+                content,
+                r: PhantomData,
+            }
+        }
+
+        pub fn get(&self) -> &T {
+            &self.content
         }
     }
 
-    pub fn get(&self) -> &T {
-        &self.content
-    }
-}
-
-impl<T: DestroyPtr> Drop for RefMutGuard<'_, T> {
-    fn drop(&mut self) {
-        self.content.destroy()
-    }
-}
-
-pub(crate) struct RefMutContainer<T> {
-    inner: Option<*mut T>,
-}
-impl<T> RefMutContainer<T> {
-    pub fn new(content: &mut T) -> Arc<Mutex<Self>> {
-        Arc::new(Mutex::new(Self {
-            inner: Some(content),
-        }))
+    impl<T: DestroyPtr> Drop for RefMutGuard<'_, T> {
+        fn drop(&mut self) {
+            self.content.destroy()
+        }
     }
 
-    pub fn map<F: FnOnce(&T) -> U, U>(&self, f: F) -> Option<U> {
-        let ptr = self.inner.as_ref()?;
-        Some(f(unsafe { ptr.as_ref().unwrap() }))
+    pub(crate) struct RefMutContainer<T> {
+        inner: Option<*mut T>,
+    }
+    impl<T> RefMutContainer<T> {
+        pub fn new(content: &mut T) -> Arc<Mutex<Self>> {
+            Arc::new(Mutex::new(Self {
+                inner: Some(content),
+            }))
+        }
+
+        pub fn map<F: FnOnce(&T) -> U, U>(&self, f: F) -> Option<U> {
+            let ptr = self.inner.as_ref()?;
+            Some(f(unsafe { ptr.as_ref().unwrap() }))
+        }
+
+        pub fn map_mut<F: FnOnce(&mut T) -> U, U>(&mut self, f: F) -> Option<U> {
+            let ptr = self.inner.as_ref()?;
+            Some(f(unsafe { ptr.as_mut().unwrap() }))
+        }
     }
 
-    pub fn map_mut<F: FnOnce(&mut T) -> U, U>(&mut self, f: F) -> Option<U> {
-        let ptr = self.inner.as_ref()?;
-        Some(f(unsafe { ptr.as_mut().unwrap() }))
-    }
-}
-
-impl<T> DestroyPtr for RefMutContainer<T> {
-    fn destroy(&mut self) {
-        self.inner.take();
+    impl<T> DestroyPtr for RefMutContainer<T> {
+        fn destroy(&mut self) {
+            self.inner.take();
+        }
     }
 }
