@@ -4,9 +4,7 @@ use pyo3::exceptions;
 use pyo3::prelude::*;
 use pyo3::types::*;
 
-use super::{
-    DestroyPtr, PyNormalizedString, PyNormalizedStringRefMut, RefMutContainer, RefMutGuard,
-};
+use super::{DestroyPtr, PyNormalizedString, PyNormalizedStringRefMut, RefMutContainer};
 use crate::encoding::PyEncoding;
 use crate::error::ToPyResult;
 use crate::token::PyToken;
@@ -272,10 +270,10 @@ impl DestroyPtr for PyPreTokenizedStringRefMut {
 }
 
 impl PyPreTokenizedStringRefMut {
-    pub fn new(pretok: &mut tk::PreTokenizedString) -> RefMutGuard<'_, Self> {
+    pub fn new(pretok: &mut tk::PreTokenizedString) -> super::RefMutGuard<'_, Self> {
         // SAFETY: This is safe because we return a RefMutGuard here.
         // The compiler will make sure the &mut stays valid as necessary.
-        RefMutGuard::new(Self {
+        super::RefMutGuard::new(Self {
             inner: RefMutContainer::new(pretok),
         })
     }
